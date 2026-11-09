@@ -1,9 +1,20 @@
+# Python and local environment
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
-.DS_Store
 .ipynb_checkpoints/
+.DS_Store
+
+# Source images and generated model artifacts
 data/raw/
 outputs/
-# Commit small tables and plots in reports/ once generated.
+
+# Reproducible fold assignments
+splits/
+
+# Generated reports: keep only the figure referenced in README
+reports/*
+!reports/figures/
+reports/figures/*
+!reports/figures/hard_errors.png
