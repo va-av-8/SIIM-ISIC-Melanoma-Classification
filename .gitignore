@@ -13,8 +13,10 @@ outputs/
 # Reproducible fold assignments
 splits/
 
-# Generated reports: keep only the figure referenced in README
+# Generated reports
 reports/*
 !reports/figures/
 reports/figures/*
 !reports/figures/hard_errors.png
+!reports/figures/roc_oof.png
+!reports/figures/pr_oof.png
