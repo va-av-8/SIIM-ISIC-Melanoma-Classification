@@ -2,7 +2,9 @@
 from collections import defaultdict
 from pathlib import Path
 import hashlib
+import sys
 import pandas as pd
+from tqdm import tqdm
 import yaml
 
 
@@ -32,10 +34,14 @@ def image_path(images_dir, name):
     return Path(images_dir) / (name if name.lower().endswith('.jpg') else f'{name}.jpg')
 
 
-def find_duplicates(df, images_dir):
+def find_duplicates(df, images_dir, progress=False):
     """Find only identical file bytes. Hashes are never saved."""
     seen = defaultdict(list)
-    for name in df.image_name:
+    iterator = tqdm(
+        df.image_name, total=len(df), desc='SHA-256', unit='img',
+        disable=not progress, file=sys.stdout, mininterval=1.0,
+    )
+    for name in iterator:
         h = hashlib.sha256()
         with image_path(images_dir, name).open('rb') as f:
             for chunk in iter(lambda: f.read(1024 * 1024), b''):

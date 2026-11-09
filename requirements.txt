@@ -7,3 +7,4 @@ PyYAML==6.0.3
 joblib==1.5.3
 torch==2.10.0
 torchvision==0.25.0
+tqdm==4.67.3

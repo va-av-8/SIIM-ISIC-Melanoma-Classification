@@ -1,12 +1,14 @@
 """EDA using Kaggle train.csv and ORIGINAL JPEGs; no splitting or preprocessing."""
 import argparse
 import json
+import sys
 from pathlib import Path
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image, ImageStat
+from tqdm import tqdm
 from src.common import config, load_data, image_path, find_duplicates, duplicate_table, remove_exact_duplicates
 
 
@@ -72,14 +74,17 @@ def run(path):
     actual = {p.name for p in images_dir.glob('*.jpg')}
     pd.DataFrame({'image_name': sorted(actual - expected)}).to_csv(out / 'unreferenced_images.csv', index=False)
     pd.DataFrame({'image_name': sorted(expected - actual)}).to_csv(out / 'missing_images.csv', index=False)
-    groups = find_duplicates(df, images_dir)
+    groups = find_duplicates(df, images_dir, progress=True)
     duplicate_table(df, groups).to_csv(out / 'exact_duplicates.csv', index=False)
     cleaned, excluded = remove_exact_duplicates(df, groups)
     excluded.to_csv(out / 'excluded_images.csv', index=False)
 
     records = []
     threshold = int(cfg['eda']['dark_pixel_threshold'])
-    for i, name in enumerate(df.image_name):
+    for name in tqdm(
+        df.image_name, total=len(df), desc='Image stats', unit='img',
+        file=sys.stdout, mininterval=1.0,
+    ):
         with Image.open(image_path(cfg['data']['images_dir'], name)) as img:
             width, height = img.size
             gray = img.convert('L')
@@ -87,8 +92,6 @@ def run(path):
             records.append(dict(image_name=name, width=width, height=height,
                                 brightness=stats.mean[0], contrast=stats.stddev[0],
                                 dark_fraction=sum(gray.histogram()[:threshold]) / (width * height)))
-        if (i + 1) % 2000 == 0:
-            print(f'Image statistics: {i+1}/{len(df)}')
     img_df = pd.DataFrame(records).merge(df[['image_name', 'target']], on='image_name', validate='one_to_one')
     img_df.to_csv(out / 'image_statistics.csv', index=False)
     for col in ('brightness', 'contrast', 'dark_fraction'):

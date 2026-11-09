@@ -1,6 +1,6 @@
 data:
-  labels_csv: /kaggle/input/siim-isic-melanoma-classification/train.csv
-  images_dir: /kaggle/input/siim-isic-melanoma-classification/jpeg/train
+  labels_csv: /kaggle/input/competitions/siim-isic-melanoma-classification/train.csv
+  images_dir: /kaggle/input/competitions/siim-isic-melanoma-classification/jpeg/train
   clean_csv: /kaggle/working/reports/eda/clean_train.csv
   eda_dir: /kaggle/working/reports/eda
   splits_csv: /kaggle/working/splits/folds.csv
