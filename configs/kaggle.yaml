@@ -1,0 +1,25 @@
+data:
+  labels_csv: /kaggle/input/competitions/siim-isic-melanoma-classification/train.csv
+  images_dir: /kaggle/input/competitions/siim-isic-melanoma-classification/jpeg/train
+  clean_csv: /kaggle/working/reports/eda/clean_train.csv
+  eda_dir: /kaggle/working/reports/eda
+  splits_csv: /kaggle/working/splits/folds.csv
+  output_dir: /kaggle/working/outputs/baseline
+  report_dir: /kaggle/working/reports/baseline
+eda:
+  dark_pixel_threshold: 32
+model:
+  device: auto
+  batch_size: 32
+  num_workers: 2
+  weights_path: null
+validation:
+  n_splits: 5
+  seed: 42
+logreg:
+  C: 1.0
+  solver: liblinear
+  l1_ratio: 0.0  # L2 regularization (sklearn 1.8+)
+  max_iter: 2000
+  tol: 0.0001
+  class_weights: [null, balanced]
