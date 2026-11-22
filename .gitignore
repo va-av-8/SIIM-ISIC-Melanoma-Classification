@@ -25,6 +25,7 @@ reports/figures/*
 !reports/figures/pr_oof.png
 !reports/figures/resolution_analysis.png
 !reports/figures/experiment_comparison.png
+!reports/figures/wandb_tracking.png
 !reports/figures/M-full/
 !reports/figures/A-age/
 !reports/figures/A-sex/
