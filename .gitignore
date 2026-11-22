@@ -5,6 +5,9 @@ __pycache__/
 .venv/
 .ipynb_checkpoints/
 .DS_Store
+.env
+.env.*
+wandb/
 
 # Source images and generated model artifacts
 data/raw/
@@ -20,3 +23,14 @@ reports/figures/*
 !reports/figures/hard_errors.png
 !reports/figures/roc_oof.png
 !reports/figures/pr_oof.png
+!reports/figures/resolution_analysis.png
+!reports/figures/experiment_comparison.png
+!reports/figures/M-full/
+!reports/figures/A-age/
+!reports/figures/A-sex/
+!reports/figures/A-site/
+reports/figures/*/*
+!reports/figures/*/roc_oof.png
+!reports/figures/*/pr_oof.png
+!reports/figures/*/resolution_analysis.png
+!reports/figures/*/hard_errors.png

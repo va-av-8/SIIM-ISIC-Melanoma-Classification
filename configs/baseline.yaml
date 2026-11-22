@@ -5,7 +5,20 @@ data:
   eda_dir: reports/eda
   splits_csv: splits/folds.csv
   output_dir: outputs/baseline
+  embeddings_cache: outputs/baseline/embeddings.npz
   report_dir: reports/baseline
+  figure_dir: reports/figures
+resolution_analysis:
+  top_n: 10
+  min_positive: 10
+experiments:
+  variants: [B0, B1, M-full, A-age, A-sex, A-site]
+wandb:
+  enabled: false  # Set true after installing/authenticating W&B.
+  project: siim-isic-melanoma
+  entity: null
+  mode: online
+  group: metadata_experiment
 eda:
   dark_pixel_threshold: 32
 model:
