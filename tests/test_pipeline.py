@@ -10,7 +10,7 @@ from src.train import run as train
 from src.evaluate import evaluate
 
 
-def setup(tmp_path):
+def make_config(tmp_path):
     folder = tmp_path / 'jpeg' / 'train'
     folder.mkdir(parents=True)
     rows = []
@@ -44,7 +44,7 @@ def setup(tmp_path):
 
 
 def test_eda(tmp_path):
-    path = setup(tmp_path)
+    path = make_config(tmp_path)
     result = eda(path)
     assert result['n_images'] == 80
     assert result['n_exact_duplicate_groups'] == 1
@@ -59,8 +59,17 @@ def test_eda(tmp_path):
     assert not (tmp_path / 'splits' / 'folds.csv').exists()
 
 
-def test_splits_and_evaluation(tmp_path):
-    path = setup(tmp_path)
+@pytest.mark.parametrize('relative_paths', [False, True])
+def test_splits_and_evaluation(tmp_path, monkeypatch, relative_paths):
+    path = make_config(tmp_path)
+    # Local configs use relative paths; Kaggle configs use absolute paths.
+    cfg = yaml.safe_load(path.read_text())
+    cfg['data']['figure_dir'] = str(tmp_path / 'custom_figures')
+    if relative_paths:
+        monkeypatch.chdir(tmp_path)
+        cfg['data'] = {key: str(Path(value).relative_to(tmp_path))
+                       for key, value in cfg['data'].items()}
+    path.write_text(yaml.safe_dump(cfg))
     eda(path)
     folds = train(path, only_folds=True)
     assert not folds.groupby('patient_id').fold.nunique().gt(1).any()
@@ -79,10 +88,17 @@ def test_splits_and_evaluation(tmp_path):
     pd.concat(oof).to_csv(out / 'oof_predictions.csv', index=False)
     result = evaluate(str(path))
     assert len(result['fold_metrics']) == 10
+    metrics = pd.read_csv(tmp_path / 'reports' / 'baseline' / 'resolution_metrics.csv')
+    pd.testing.assert_frame_equal(metrics, result['resolution_metrics'])
+    assert metrics.n.sum() == len(folds)
+    assert metrics.n_positive.sum() == folds.target.sum()
+    assert (tmp_path / 'custom_figures' / 'resolution_analysis.png').is_file()
+    assert (tmp_path / 'reports' / 'baseline' / 'roc_oof.png').is_file()
+    assert (tmp_path / 'reports' / 'baseline' / 'pr_oof.png').is_file()
 
 
 def test_duplicate_image_id_rejected(tmp_path):
-    path = setup(tmp_path)
+    path = make_config(tmp_path)
     cfg = yaml.safe_load(path.read_text())
     csv = Path(cfg['data']['labels_csv'])
     df = pd.read_csv(csv)
@@ -109,6 +125,6 @@ def test_duplicate_cleaning_rules():
 
 
 def test_training_requires_eda(tmp_path):
-    path = setup(tmp_path)
+    path = make_config(tmp_path)
     with pytest.raises(FileNotFoundError, match='Run src.eda first'):
         train(path, only_folds=True)

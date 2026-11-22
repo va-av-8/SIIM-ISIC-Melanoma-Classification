@@ -8,3 +8,4 @@ joblib==1.5.3
 torch==2.10.0
 torchvision==0.25.0
 tqdm==4.67.3
+# Optional experiment tracking (only with wandb.enabled: true): pip install wandb

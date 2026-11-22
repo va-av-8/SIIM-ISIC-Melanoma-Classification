@@ -5,7 +5,20 @@ data:
   eda_dir: /kaggle/working/reports/eda
   splits_csv: /kaggle/working/splits/folds.csv
   output_dir: /kaggle/working/outputs/baseline
+  embeddings_cache: /kaggle/working/outputs/baseline/embeddings.npz
   report_dir: /kaggle/working/reports/baseline
+  figure_dir: /kaggle/working/reports/figures
+resolution_analysis:
+  top_n: 10
+  min_positive: 10
+experiments:
+  variants: [B0, B1, M-full, A-age, A-sex, A-site]
+wandb:
+  enabled: true
+  project: SIIM-ISIC-Melanoma-Classification
+  entity: null
+  mode: online
+  group: metadata_experiment
 eda:
   dark_pixel_threshold: 32
 model:
