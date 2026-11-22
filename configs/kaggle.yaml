@@ -14,8 +14,8 @@ resolution_analysis:
 experiments:
   variants: [B0, B1, M-full, A-age, A-sex, A-site]
 wandb:
-  enabled: false  # Set true after installing/authenticating W&B.
-  project: siim-isic-melanoma
+  enabled: true
+  project: SIIM-ISIC-Melanoma-Classification
   entity: null
   mode: online
   group: metadata_experiment

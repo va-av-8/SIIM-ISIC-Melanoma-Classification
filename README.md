@@ -331,7 +331,7 @@ SDK необязателен: при `wandb.enabled: false` он не импор
 ```yaml
 wandb:
   enabled: true
-  project: siim-isic-melanoma
+  project: SIIM-ISIC-Melanoma-Classification
   entity: null
   mode: online
   group: metadata_experiment
