@@ -121,7 +121,7 @@ def variant_config(cfg, variant):
     return derived
 
 
-def load_result(cfg, group, protocol):
+def load_result(cfg, group, protocol, check_environment=True):
     output = Path(variant_config(cfg, group)['data']['output_dir'])
     path = output / 'oof_predictions.csv'
     if not path.is_file():
@@ -130,7 +130,15 @@ def load_result(cfg, group, protocol):
     saved = {}
     if snapshot.is_file():
         saved = json.loads(snapshot.read_text())
-        if saved.get('protocol') != protocol:
+        expected = json.loads(json.dumps(protocol))
+        stored = json.loads(json.dumps(saved.get('protocol', {})))
+        if not check_environment:
+            # CSV-only diagnostics need no matching extraction/runtime installation.
+            # Data, folds, model parameters and preprocessing are still checked.
+            for item in (expected, stored):
+                item.pop('libraries', None)
+                item.get('image_extractor', {}).pop('libraries', None)
+        if stored != expected:
             raise ValueError(f'{group}: saved run does not match current data/folds/config')
         if saved.get('oof_sha256') != hashlib.sha256(path.read_bytes()).hexdigest():
             raise ValueError(f'{group}: OOF file differs from its saved run configuration')
@@ -151,6 +159,18 @@ def load_result(cfg, group, protocol):
     if saved and saved.get('variants') != {v: variant_spec(v) for v in predictions.variant.unique()}:
         raise ValueError(f'{group}: saved variant definitions differ from current configuration')
     return predictions, saved
+
+
+def save_run_result(predictions, cfg, members, protocol, feature_hash):
+    """Persist OOF and its provenance in the existing HW2 format."""
+    output = Path(cfg['data']['output_dir'])
+    output.mkdir(parents=True, exist_ok=True)
+    path = output / 'oof_predictions.csv'
+    predictions.to_csv(path, index=False)
+    saved = dict(protocol=protocol, variants={v: variant_spec(v) for v in members},
+                 embeddings_sha256=feature_hash,
+                 oof_sha256=hashlib.sha256(path.read_bytes()).hexdigest())
+    (output / 'run_config.json').write_text(json.dumps(saved, indent=2), encoding='utf-8')
 
 
 def run(config_path, variants=None, stage='all', recompute_embeddings=False):
@@ -207,13 +227,9 @@ def run(config_path, variants=None, stage='all', recompute_embeddings=False):
                 frame, transform = experiment_features(features, data, variant)
                 records.append(fit_oof(folds, frame, cfg, output,
                                        class_weight=spec['class_weight'], preprocessor=transform))
-            path = output / 'oof_predictions.csv'
-            pd.concat(records, ignore_index=True).to_csv(path, index=False)
+            save_run_result(pd.concat(records, ignore_index=True), run_cfg, members,
+                            protocol, feature_hash)
             save_fold_balance(folds, run_cfg['data']['report_dir'])
-            saved = dict(protocol=protocol, variants={v: variant_spec(v) for v in members},
-                         embeddings_sha256=feature_hash,
-                         oof_sha256=hashlib.sha256(path.read_bytes()).hexdigest())
-            (output / 'run_config.json').write_text(json.dumps(saved, indent=2), encoding='utf-8')
     if stage == 'train':
         return {'variants': selected}
     loaded = {group: load_result(cfg, group, protocol)

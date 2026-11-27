@@ -39,6 +39,19 @@ def variant_spec(variant):
     }
 
 
+def generate_folds(df, cfg, split_seed=None):
+    """Generate assignments in current row order, without reading/writing saved folds."""
+    splitter = StratifiedGroupKFold(
+        n_splits=int(cfg['validation']['n_splits']), shuffle=True,
+        random_state=int(cfg['validation']['seed'] if split_seed is None else split_seed))
+    folds = np.full(len(df), -1)
+    for i, (_, val) in enumerate(splitter.split(df, df.target, groups=df.patient_id)):
+        folds[val] = i
+    result = df[['image_name', 'patient_id', 'target']].copy()
+    result['fold'] = folds
+    return result
+
+
 def make_folds(df, cfg):
     path = Path(cfg['data']['splits_csv'])
     if path.exists():
@@ -52,11 +65,7 @@ def make_folds(df, cfg):
                 raise ValueError(f'Saved folds have different {col} values')
         folds = old.set_index('image_name').loc[df.image_name, 'fold'].to_numpy()
     else:
-        splitter = StratifiedGroupKFold(n_splits=int(cfg['validation']['n_splits']),
-                                        shuffle=True, random_state=int(cfg['validation']['seed']))
-        folds = np.full(len(df), -1)
-        for i, (_, val) in enumerate(splitter.split(df, df.target, groups=df.patient_id)):
-            folds[val] = i
+        folds = generate_folds(df, cfg).fold.to_numpy()
     result = df[['image_name', 'patient_id', 'target']].copy()
     result['fold'] = folds
     if (not result.fold.isin(range(cfg['validation']['n_splits'])).all()
@@ -227,7 +236,8 @@ def experiment_features(features, data, variant):
     return frame, ColumnTransformer(transforms, remainder='drop')
 
 
-def fit_oof(folds, features, cfg, output=None, class_weight=None, preprocessor=None):
+def fit_oof(folds, features, cfg, output=None, class_weight=None, preprocessor=None,
+            train_masks=None):
     """Shared CV loop; optionally save models for the standalone training command."""
     if output is not None:
         output = Path(output)
@@ -237,11 +247,18 @@ def fit_oof(folds, features, cfg, output=None, class_weight=None, preprocessor=N
     predictions = []
     for fold in sorted(folds.fold.unique()):
         val = folds.fold.to_numpy() == fold
+        train = ~val if train_masks is None else np.asarray(train_masks[fold])
+        if train.shape != val.shape or train.dtype != bool or (train & val).any():
+            raise ValueError('Train mask must be boolean and exclude validation rows')
+        if set(folds.loc[train, 'patient_id']) & set(folds.loc[val, 'patient_id']):
+            raise ValueError('Patient leakage between train subset and validation')
+        if len(np.unique(y[train])) != 2:
+            raise ValueError(f'Fold {fold}: training subset must contain both classes')
         transform = StandardScaler() if preprocessor is None else clone(preprocessor)
         clf = make_pipeline(transform, make_logreg(cfg, class_weight))
-        train_x = features.iloc[~val] if isinstance(features, pd.DataFrame) else features[~val]
+        train_x = features.iloc[train] if isinstance(features, pd.DataFrame) else features[train]
         val_x = features.iloc[val] if isinstance(features, pd.DataFrame) else features[val]
-        clf.fit(train_x, y[~val])
+        clf.fit(train_x, y[train])
         piece = folds.loc[val].copy()
         piece['score'] = clf.predict_proba(val_x)[:, 1]
         piece['class_weight'] = weight

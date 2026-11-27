@@ -138,9 +138,23 @@ def evaluate_predictions(df: pd.DataFrame, cfg: dict, model_label: str = 'B0') -
             "resolution_metrics": resolutions, 'figures': figures}
 
 
+def draw_error_image(ax, row, images_dir):
+    """Original JPEG and the shared HW1 error caption; never impute missing images."""
+    from PIL import Image
+    path = image_path(images_dir, row.image_name)
+    if not path.is_file():
+        raise FileNotFoundError(f'Error example JPEG not found: {path}')
+    with Image.open(path) as source:
+        preview = source.convert('RGB')
+        preview.thumbnail((512, 512))
+        ax.imshow(preview)
+    ax.axis('off')
+    ax.set_title(f'{row.error}: {row.image_name}\ntarget={row.target}, score={row.score:.6f}, fold={row.fold}',
+                 fontsize=10)
+
+
 def plot_error_examples(errors: pd.DataFrame, cfg: dict, model_label: str) -> None:
     """Two highest-score FP and two lowest-score FN, using the report's threshold 0.5."""
-    from PIL import Image
     report = Path(cfg['data']['report_dir'])
     figure_dir = Path(cfg['data'].get('figure_dir', report.parent / 'figures'))
     figure_dir.mkdir(parents=True, exist_ok=True)
@@ -157,10 +171,7 @@ def plot_error_examples(errors: pd.DataFrame, cfg: dict, model_label: str) -> No
             row = rows.iloc[i]
             path = image_path(cfg['data']['images_dir'], row.image_name) if cfg['data'].get('images_dir') else None
             if path is not None and path.is_file():
-                with Image.open(path) as source:
-                    preview = source.convert('RGB')
-                    preview.thumbnail((512, 512))
-                    ax.imshow(preview)
+                draw_error_image(ax, row, cfg['data']['images_dir'])
             else:
                 ax.text(.5, .5, 'JPEG unavailable', ha='center')
                 missing_images += 1
@@ -328,6 +339,23 @@ def evaluate_resolutions(config_path: str, *, oof: pd.DataFrame | None = None,
     return metrics
 
 
+def validate_oof(group, folds, expected_weight='none'):
+    """Check a single variant against every saved image, label, patient and fold."""
+    required = {'image_name', 'patient_id', 'target', 'fold', 'score', 'class_weight'}
+    if missing := required - set(group.columns):
+        raise ValueError(f'Missing OOF columns: {sorted(missing)}')
+    reference = folds.set_index('image_name').sort_index()
+    if (group.image_name.isna().any() or group.image_name.duplicated().any()
+            or set(group.image_name) != set(reference.index)):
+        raise ValueError('OOF image keys differ from saved folds')
+    aligned = group.set_index('image_name').loc[reference.index]
+    for column in ('patient_id', 'target', 'fold'):
+        if not aligned[column].eq(reference[column]).all():
+            raise ValueError(f'OOF {column} differs from saved folds')
+    if not group.class_weight.eq(expected_weight).all() or not group.score.between(0, 1).all():
+        raise ValueError(f'Expected class_weight={expected_weight} and valid OOF probabilities')
+
+
 def evaluate_experiments(predictions, folds, report_dir, figure_path):
     """Validate paired OOF coverage, then compare configurations on identical folds."""
     from src.train import variant_spec
@@ -338,19 +366,10 @@ def evaluate_experiments(predictions, folds, report_dir, figure_path):
         raise ValueError('Experiment comparison requires B0 OOF predictions')
     order = list(dict.fromkeys(predictions.variant))
     per_fold = []
-    reference = folds.set_index('image_name').sort_index()
     for variant, group in predictions.groupby('variant', sort=False):
-        if (group.image_name.isna().any() or group.image_name.duplicated().any()
-                or set(group.image_name) != set(reference.index)):
-            raise ValueError(f'{variant}: OOF image keys differ from saved folds')
-        aligned = group.set_index('image_name').loc[reference.index]
-        for column in ('patient_id', 'target', 'fold'):
-            if not aligned[column].eq(reference[column]).all():
-                raise ValueError(f'{variant}: OOF {column} differs from saved folds')
         spec = variant_spec(variant)
         expected_weight = spec['class_weight'] or 'none'
-        if not group.class_weight.eq(expected_weight).all() or not group.score.between(0, 1).all():
-            raise ValueError(f'{variant}: expected class_weight={expected_weight} and valid OOF probabilities')
+        validate_oof(group, folds, expected_weight)
         for fold, part in group.groupby('fold'):
             per_fold.append(dict(stage=spec['stage'], variant=variant, fold=int(fold),
                                  **metric_values(part.target.to_numpy(), part.score.to_numpy())))
